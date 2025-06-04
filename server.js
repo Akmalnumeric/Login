@@ -1,9 +1,9 @@
-import express from 'express';
-import mysql from 'mysql2';
-import path from 'path';
-import dotenv from 'dotenv';
-import cors from 'cors'; //Cross-Origin Resource Sharing, sistem keamanan browser yang mengatur fetching data yang berbeda domain
-
+const express = require('express');
+const mysql = require('mysql2');
+const path = require('path');
+const dotenv = require('dotenv');
+const cors = require('cors');
+ 
 dotenv.config();
 const app = express(); //objek utama dari express
 const port = 3001;
