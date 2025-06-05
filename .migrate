@@ -1,9 +1,0 @@
-{
-  "lastRun": "001-create-users.js",
-  "migrations": [
-    {
-      "title": "001-create-users.js",
-      "timestamp": 1748414544566
-    }
-  ]
-}

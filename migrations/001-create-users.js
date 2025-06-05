@@ -1,19 +1,41 @@
-const db = require('../db');
+const getDbConnection = require('../db');
 
-exports.up = async function () {
-  console.log('🔧 Running migration: create users table...');
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      password VARCHAR(20) NOT NULL
-    )
-  `);
-  console.log('✅ Users table created!');
+module.exports.up = function () {
+  console.log('🚀 Running migration 001...');
+  return getDbConnection().then(db => {
+    return db.execute(`CREATE DATABASE IF NOT EXISTS inventory4;`)
+      .then(() => {
+        return db.changeUser({ database: 'inventory4' });
+      })
+      .then(() => {
+        return db.execute(`
+          CREATE TABLE IF NOT EXISTS users3 (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(255) NOT NULL,
+            password VARCHAR(255) NOT NULL
+          )
+        `);
+      })
+      .then(() => {
+        return db.execute(`
+          ALTER TABLE users3
+          ADD COLUMN keterangan VARCHAR(255) NOT NULL AFTER password`); 
+      });
+  }); 
 };
 
-exports.down = async function () {
-  console.log('🧨 Dropping users table...');
-  await db.query('DROP TABLE IF EXISTS users');
-  console.log('✅ Users table dropped!');
+
+
+module.exports.down = function () {
+  return getDbConnection().then(db => {
+    return db.changeUser({ database: 'inventory4' }) 
+      .then(() => {
+        return db.execute('DROP TABLE IF EXISTS users3');
+      })
+      .then (() => {
+        return db.execute(`
+          ALTER TABLE users3
+          DROP COLUMN keterangan`)
+      });
+  });
 };

@@ -20,7 +20,7 @@ const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
   password: process.env.DB_PASSWORD,
-  database: 'example'
+  database: 'inv_management'
 }); // membuat variable db yang isinya koneksi ke database yang digunakan untuk projek ini
 
 db.connect((err) => {
