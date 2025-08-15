@@ -1,77 +1,162 @@
 const express = require('express');
 const mysql = require('mysql2');
-const path = require('path');
 const dotenv = require('dotenv');
 const cors = require('cors');
- 
+const session = require('express-session');
+const bcrypt = require('bcrypt');
+const accountsRoutes = require('./accounts');
+const passRoutes = require('./password-change');
+const itemsRoutes = require('./items');
+
 dotenv.config();
-const app = express(); //objek utama dari express
+const app = express();
 const port = 3001;
 
- 
-app.use(express.urlencoded({ extended: true })); //middleware untuk membaca data dari form HTML
-app.use(express.json()); //middleware untuk membaca data body dengan format JSON.
-app.use(cors({
-  origin: 'http://localhost:3000' // mengizinkan request dari frontend nextJS
+// Middleware untuk session
+app.use(session({
+  secret: 'rahasia-super-aman',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // true kalau pakai HTTPS
+    httpOnly: true,
+    maxAge: 1000 * 60 * 60
+  },
 }));
 
- 
+// Middleware umum
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true,
+}));
+
+// Koneksi ke database
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: 'inv_management'
-}); // membuat variable db yang isinya koneksi ke database yang digunakan untuk projek ini
+  database: process.env.DB_NAME,
+});
+
+app.use("/accounts", accountsRoutes);
+app.use("/password-change", passRoutes);
+app.use("/items", itemsRoutes);
 
 db.connect((err) => {
   if (err) {
     return console.error('Gagal konek ke database:', err.message);
   }
   console.log('Berhasil konek ke database!');
-}); // mengeksekusi perintah db.connect, mengkoneksikan dengan database, kalau error, memberi error massage ke terminal "gagal konek ke database". kalau sukses memberi massage sukses.
+});
 
 // Login route
-app.post('/login', (req, res) => { // req res = callback function
-  const { email, password } = req.body; //jika frontend request POST ke server ini, akan mengambil value email dan password dari body request
+app.post('/login', (req, res) => {
+  const { email, password } = req.body;
+  const query = 'SELECT * FROM users WHERE email = ?';
 
-  const query = 'SELECT * FROM users WHERE email = ? AND password = ?'; //membuat query yang berisi SELECT * FROM users (membaca semua isi tabel users) WHERE email = ? AND password = ?'(mencari data dari array email dan password, dengan ? sebagai placeholder)
-  db.query(query, [email, password], (err, results) => { // eksekusi query ke dalam db, email, password adalah data yang menggantikan placeholder ?, err, results adalah callback function
+  db.query(query, [email], (err, results) => {
     if (err) {
-      console.error('Query error:', err);
-      return res.status(500).json({ success: false, message: 'Database error' }); // kalau error, memberi massage ke terminal "query error", dan memberi respon ke server dengan status(500) yang berarti "internal server error" dengan massage "database error"
+      return res.status(500).json({ success: false, message: 'Database error' });
     }
 
     if (results.length > 0) {
-      const username = results[0].email;
-      res.json({ success: true, username });
-    } else {
-      res.json({ success: false, message: 'Email atau password salah' });
-    } //kalau sukses (length > 0, membuat variable username dengan value email yang ditemukan, lalu mengirim respons JSON ke client dengan menampilkan username tersebut, jika password atau email tidak ditemukan/salah (length <= 0) maka akan mengirim respon JSON massage "Email atau password salah"
+      const user = results[0];
+      bcrypt.compare(password, user.password, (err, Matched) => {
+        if (err) return res.status(500).json({ success: false, message: 'Error saat verifikasi password' });
+
+        if (Matched) {
+          req.session.user = { id: user.id, email: user.email };
+          const username = user.email.split("@")[0];
+          res.json({ success: true, email: user.username, username });
+        } else {
+          res.json({ success: false, message: 'Email atau password salah' });
+        }
+      });
+    }
   });
 });
 
 // Signup route
-app.post('/signup', (req, res) => { //endpoint sign up
+app.post('/signup', (req, res) => {
   const { email, password } = req.body;
+  const checkQuery = 'SELECT * FROM users WHERE email = ?';
 
-  const checkQuery = 'SELECT * FROM users WHERE email = ?'; //memasukkan 'checkQuery'(variable yang berisi variabel yang berisi string query SQL untuk memeriksa apakah email tertentu sudah ada di database. dengan mengecek array email (email = ?)
   db.query(checkQuery, [email], (err, results) => {
-    if (err) return res.status(500).json({ success: false, message: 'Database error' }); //kalau gagal, mengirimkan respon status(500) dan massage 'database error'
+    if (err) return res.status(500).json({ success: false, message: 'Database error' });
 
     if (results.length > 0) {
       return res.json({ success: false, message: 'Email sudah digunakan' });
-    } //kalau result.length > 0 artinya sudah ada yang memakai emailnya
+    }
 
-    const insertQuery = 'INSERT INTO users (email, password) VALUES (?, ?)'; //memasukkan 'insertQuery" dengan email dan password yang sudah diisi client
-    db.query(insertQuery, [email, password], (err) => {
-      if (err) return res.status(500).json({ success: false, message: 'Gagal mendaftar' }); //kalau gagal, mengirimkan respon status(500) dan massage 'Gagal mendaftar'
+    bcrypt.hash(password, 10, (err, hashedPassword) => {
+      if (err) return res.status(500).json({ success: false, message: 'Error saat enkripsi password' });
 
-      res.json({ success: true, message: 'Pendaftaran berhasil!' }); //kalau sukses, memberi respon JSON massage "Pendaftaran berhasil" pada client.
+      const insertQuery = 'INSERT INTO users (email, password) VALUES (?, ?)';
+      db.query(insertQuery, [email, hashedPassword], (err) => {
+        if (err) return res.status(500).json({ success: false, message: 'Gagal mendaftar' });
+
+        res.json({ success: true, message: 'Pendaftaran berhasil!' });
+      });
     });
   });
 });
 
- 
-app.listen(port, () => { 
+// Ambil semua user (hanya id dan email)
+app.get('/users', (req, res) => {
+  db.query('SELECT id, email FROM users', (err, results) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Gagal mengambil user' });
+    }
+    res.json(results);
+  });
+});
+
+// Ganti password user berdasarkan ID
+app.put('/users/:id/password', (req, res) => {
+  const userId = req.params.id;
+  const { oldPassword, newPassword } = req.body;
+
+  if (!userId || !oldPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Field tidak lengkap' });
+  }
+
+  const getQuery = 'SELECT * FROM users WHERE id = ?';
+
+  db.query(getQuery, [userId], (err, results) => {
+    if (err || results.length === 0) {
+      return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+    }
+
+    const user = results[0];
+
+    bcrypt.compare(oldPassword, user.password, (err, isMatch) => {
+      if (err) return res.status(500).json({ success: false, message: 'Gagal verifikasi password lama' });
+
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Password lama salah' });
+      }
+
+      bcrypt.hash(newPassword, 10, (err, hashedNewPassword) => {
+        if (err) return res.status(500).json({ success: false, message: 'Gagal hash password baru' });
+
+        const updateQuery = 'UPDATE users SET password = ? WHERE id = ?';
+        db.query(updateQuery, [hashedNewPassword, userId], (err) => {
+          if (err) {
+            return res.status(500).json({ success: false, message: 'Gagal update password' });
+          }
+
+          res.json({ success: true, message: 'Password berhasil diubah!' });
+        });
+      });
+    });
+  });
+});
+
+
+
+// Start server
+app.listen(port, () => {
   console.log(`🚀 Server backend berjalan di http://localhost:${port}`);
-}); //menjalankan method app.Listen untuk menjalankan server web dan membuatnya mulai "mendengarkan" (listening) permintaan (request) dari client pada port tertentu. setelah sukses akan menampilkan pesan di terminal "🚀 Server backend berjalan di http://localhost:(port)" 
+});

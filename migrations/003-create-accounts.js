@@ -9,11 +9,13 @@ module.exports.up = function () {
       })
       .then(() => {
         return db.execute(`
-          CREATE TABLE IF NOT EXISTS \`${process.env.TABLE_NAME}\` (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            email VARCHAR(255) NOT NULL,
-            password VARCHAR(255) NOT NULL
-          )
+          CREATE TABLE IF NOT EXISTS \`${process.env.TABLE_NAME_2}\` (
+        username VARCHAR(50) PRIMARY KEY,
+        active TINYINT(1) DEFAULT 1,
+        keterangan TEXT,
+        created_by int,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+        )
         `);
       })
   }); 
@@ -25,7 +27,7 @@ module.exports.down = function () {
   return getDbConnection().then(db => {
     return db.changeUser({ database: `${process.env.DB_NAME}` }) 
       .then (() => {
-        return db.execute(`DROP TABLE IF EXISTS \`${process.env.TABLE_NAME}\``)
+        return db.execute(`DROP TABLE IF EXISTS \`${process.env.TABLE_NAME_2}\``)
       });
   });
 };
