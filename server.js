@@ -7,6 +7,8 @@ const bcrypt = require('bcrypt');
 const accountsRoutes = require('./accounts');
 const passRoutes = require('./password-change');
 const itemsRoutes = require('./items');
+const categoryRoutes = require('./category')
+const storeRoutes = require('./store')
 
 dotenv.config();
 const app = express();
@@ -43,6 +45,8 @@ const db = mysql.createConnection({
 app.use("/accounts", accountsRoutes);
 app.use("/password-change", passRoutes);
 app.use("/items", itemsRoutes);
+app.use("/category", categoryRoutes);
+app.use("/store", storeRoutes);
 
 db.connect((err) => {
   if (err) {

@@ -16,7 +16,7 @@ router.get("/", (req, res) => {
 router.get("/by-id/:id", (req, res) => {
   const { id } = req.params;
 
-  db.query("SELECT * FROM items WHERE id = ?", [id], (err, rows) => {
+  db.query("SELECT * FROM items WHERE items_id = ?", [id], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: "Gagal mengambil data item berdasarkan ID" });
     }
@@ -48,25 +48,51 @@ router.get("/by-category/:category", (req, res) => {
   );
 });
 
-
-// POST buat item baru
+// POST /items
 router.post("/", (req, res) => {
   const { name, store, price, category } = req.body;
-  if (!name || !price) {
-    return res.status(400).json({ error: "Nama dan harga wajib diisi" });
+
+  if (!name || !store || !price || !category) {
+    return res.status(400).json({ error: "Semua field wajib diisi" });
   }
 
-  db.query(
-    "INSERT INTO items (name, store, price, category) VALUES (?, ?, ?, ?)",
-    [name, store, price, category],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({ error: "Gagal menambahkan data" });
-      }
-      res.status(201).json({ id: result.insertId, name, store, price, category });
-    }
-  );
+    // Cek category
+  db.query("SELECT category_id FROM category WHERE name = ?", [category], (err, catResult) => {
+    if (err) return res.status(500).json({ error: "Error cek category" });
+    if (catResult.length === 0) return res.status(400).json({ error: "Category tidak ditemukan" });
+    console.log(catResult);
+    const categoryId = catResult[0].category_id;
+
+    // Cek store
+    db.query("SELECT store_id FROM store WHERE name = ?", [store], (err, storeResult) => {
+      if (err) return res.status(500).json({ error: "Error cek store" });
+      if (storeResult.length === 0) return res.status(400).json({ error: "Store tidak ditemukan" });
+      console.log(storeResult);
+      const storeId = storeResult[0].store_id;
+
+      db.query(
+        "INSERT INTO items (name, price, store, category) VALUES (?, ?, ?, ?)",
+        [name, price, storeId, categoryId],
+        (err, result) => {
+          if (err) {
+          console.error("Query Error:", err);
+          return res.status(500).json({ error: "Gagal insert item" });
+          }
+          else;
+          res.json({ 
+          success: true, 
+          id: result.insertId,
+          name,
+          price,
+          store_id: storeId,
+          category_id: categoryId
+        });
+      });
+    });
+  });
 });
+
+
 
 // PUT update item
 router.put("/:id", (req, res) => {
@@ -93,46 +119,6 @@ router.delete("/:id", (req, res) => {
   });
 });
 
-// GET distinct categories
-router.get("/category", (req, res) => {
-  const { startsWith } = req.query;
 
-  const query = startsWith
-    ? "SELECT DISTINCT category AS name FROM items WHERE category LIKE ?"
-    : "SELECT DISTINCT category AS name FROM items";
-
-  const params = startsWith ? [`${startsWith}%`] : [];
-
-  db.query(query, params, (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: "Gagal mengambil kategori" });
-    }
-
-    const categories = rows.map((row) => ({
-      id: row.name.toLowerCase().replace(/\s+/g, "-"),
-      name: row.name,
-    }));
-
-    res.json(categories);
-  });
-});
-
-// POST add new category
-router.post("/category", (req, res) => {
-  const { name } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: "Nama kategori wajib diisi" });
-  }
-
-    db.query(
-    "INSERT INTO items (name, store, price, category) VALUES (?, ?, ?, ?)",
-    ["dummy", "dummy", 0, name],
-    (err, result) => {
-      if (err) return res.status(500).json({ error: "Gagal menambahkan kategori" });
-      res.status(201).json({ id: result.insertId, name });
-    }
-  );
-});
 
 module.exports = router;

@@ -9,14 +9,31 @@ module.exports.up = function () {
       })
       .then(() => {
         return db.execute(`
-          CREATE TABLE IF NOT EXISTS \`${process.env.TABLE_NAME_3}\` (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  store VARCHAR(255) NOT NULL,
-  description TEXT,
-  price DECIMAL(12,2) NOT NULL,
-  category VARCHAR(100)
+    CREATE TABLE IF NOT EXISTS \`${process.env.TABLE_NAME_4}\` (
+    store_id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    PRIMARY KEY (store_id)
 );
+
+    CREATE TABLE IF NOT EXISTS \`${process.env.TABLE_NAME_5}\` (
+    category_id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    PRIMARY KEY (category_id)
+);
+
+    CREATE TABLE IF NOT EXISTS \`${process.env.TABLE_NAME_3}\` (
+    items_id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(12,2) NOT NULL,
+    store INT,
+    category INT,
+    PRIMARY KEY (items_id),
+    KEY idx_store (store,
+    KEY idx_category (category),
+    CONSTRAINT fk_store_id FOREIGN KEY (store) REFERENCES store(store_id) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT fk_category_id FOREIGN KEY (category) REFERENCES category(category_id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
         `);
       })
   }); 
@@ -28,7 +45,10 @@ module.exports.down = function () {
   return getDbConnection().then(db => {
     return db.changeUser({ database: `${process.env.DB_NAME}` }) 
       .then (() => {
-        return db.execute(`DROP TABLE IF EXISTS \`${process.env.TABLE_NAME_3}\``)
+        return db.execute(`DROP TABLE IF EXISTS \`${process.env.TABLE_NAME_3}\`
+                          DROP TABLE IF EXISTS \`${process.env.TABLE_NAME_4}\`
+                          DROP TABLE IF EXISTS \`${process.env.TABLE_NAME_5}\``
+        )
       });
   });
 };
